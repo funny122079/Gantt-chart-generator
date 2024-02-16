@@ -31,22 +31,56 @@ All data is provided as a JSON structure that **has to contain**:
 
 ```json
 {
-  "packages": [
-    { "label" : "WP 1-1",
-      "start": 0,
-      "end": 2,
-      "milestones" : [2],
-      "legend": "worker one"
-    },
-    { "label" : "WP 1-2",
-      "start": 2,
-      "end": 4,
-      "milestones" : [3, 4]
-    }
-  ],
-  "title" : " Sample GANTT for \\textbf{myProject}",
-  "xlabel" : "time (weeks)",
-  "xticks" : [2,4,6,8,10,12]
+    "shifts": [
+        {
+            "name": "Jaspreet Singh",
+            "scheduled_start": "05:00",
+            "scheduled_end": "14:00",
+            "start": "05:00",
+            "end": "16:00",
+            "break": 30
+        },
+        {
+            "name": "Muskan Mahejan",
+            "scheduled_start": "08:30",
+            "scheduled_end": "14:00",
+            "start": "08:30",
+            "end": "14:00"
+        },
+        {
+            "name": "Gagandeep Kaur",
+            "scheduled_start": "09:30",
+            "scheduled_end": "15:10",
+            "start": "09:30",
+            "end": "15:30"
+        },
+        {
+            "name": "Anshika Anshika",
+            "start": "15:30",
+            "end": "22:00"
+        },
+        {
+            "name": "Devarsh Agrawal",
+            "scheduled_start": "15:00",
+            "scheduled_end": "22:00",
+            "start": "16:00",
+            "end": "22:00",
+            "break": 30
+        },
+        {
+            "name": "Dhwani Soni",
+            "start": "22:00",
+            "end": "04:30",
+            "break": 30
+        },
+        {
+            "name": "Kenal Patel",
+            "scheduled_start": "22:15",
+            "scheduled_end": "06:30",
+            "start": "22:00",
+            "end": "06:30"
+        }
+    ]
 }
 ```
 
