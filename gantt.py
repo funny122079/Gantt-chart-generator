@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
 from datetime import datetime
+import math
 
 # TeX support: on Linux assume TeX in /usr/bin, on OSX check for texlive
 if (platform.system() == 'Darwin') and 'tex' in os.getenv("PATH"):
@@ -58,10 +59,36 @@ def parse_time(time_str):
 
     decimal = minute / 60
     return float(hour) + decimal
+
+def min_time(timeList):
+    minTime = min(timeList)
+    decimal = parse_time(minTime) % 1
+    result = 0
+    if decimal == 0:
+        result = parse_time(minTime) - 1
+    else:
+        result = int(parse_time(minTime))
+
+    return result
+
+def max_time(startTimes, endTimes):
+    maxTime = 0
+    for i in range(len(endTimes)):
+        startHour = parse_time(startTimes[i])
+        endHour = parse_time(endTimes[i])
+        
+        if endHour < startHour:
+            endHour += 24
+        if maxTime < endHour:
+            maxTime = endHour
+    
+    maxTime = math.ceil(maxTime) + 1
+
+    duration = maxTime - min_time(startTimes)
+    return int(duration)
     
 class Gantt():
-    OrrangeColor = "#fd6a45"
-    BlueColor = '#48a3f5'
+    DEFCOLOR = "#01388f"
     """Gantt
     Class to render a simple Gantt chart, with optional milestones
     """
@@ -116,7 +143,7 @@ class Gantt():
             self.start[idx] = pkg.start
             self.end[idx] = pkg.end
 
-        self.xticks = [float(i + parse_time(min(self.start))) for i in range(30)]
+        self.xticks = [float(i + min_time(self.start)) for i in range(max_time(self.start, self.end))]
 
         self.durations = []
         for i in range(self.nShifts):
@@ -149,14 +176,16 @@ class Gantt():
         plt.ylim(0.5, self.nShifts + .5)
 
         # add title and package names
-        plt.yticks(self.yPos, self.names)
+        plt.yticks(self.yPos, self.names, ha='left', va='center')
+        plt.tick_params(axis='y', pad=100)
         plt.title(self.title)
 
         if self.xlabel:
             plt.xlabel(self.xlabel)
 
         if self.xticks:
-            plt.xticks(self.xticks, ["{}{}".format(int(i + parse_time(min(self.start)))%12 if int(i + parse_time(min(self.start)))%12 != 0 else 12, "A" if i < 12 else "P") for i in range(30)])
+            xticksLabels = ["{}{}".format(int(i + min_time(self.start))%12 if int(i + min_time(self.start))%12 != 0 else 12, "A" if int(i + min_time(self.start)) % 24 < 12 else "P") for i in range(max_time(self.start, self.end))]
+            plt.xticks(self.xticks, xticksLabels)
 
     def render(self):
 
@@ -167,10 +196,7 @@ class Gantt():
 
         colors = []
         for i in range(self.nShifts):
-            if i%2:
-                colors.append(self.BlueColor)
-            else:
-                colors.append(self.OrrangeColor)
+                colors.append(self.DEFCOLOR)
 
         self.barlist = plt.barh(self.yPos, self.durations,
                                 left=self.startDates,
