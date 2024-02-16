@@ -12,6 +12,7 @@ from operator import sub
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
+from datetime import datetime
 
 # TeX support: on Linux assume TeX in /usr/bin, on OSX check for texlive
 if (platform.system() == 'Darwin') and 'tex' in os.getenv("PATH"):
@@ -37,16 +38,9 @@ class Package():
     """
     def __init__(self, pkg):
 
-        DEFCOLOR = "#32AEE0"
-
-        self.label = pkg['label']
+        self.name = pkg['name']
         self.start = pkg['start']
         self.end = pkg['end']
-
-        if self.start < 0 or self.end < 0:
-            raise ValueError("Package cannot begin at t < 0")
-        if self.start > self.end:
-            raise ValueError("Cannot end before started")
 
         try:
             self.milestones = pkg['milestones']
@@ -54,17 +48,20 @@ class Package():
             pass
 
         try:
-            self.color = pkg['color']
-        except KeyError:
-            self.color = DEFCOLOR
-
-        try:
             self.legend = pkg['legend']
         except KeyError:
             self.legend = None
 
+def parse_time(time_str):
+    hour = int(time_str.split(':')[0])
+    minute = int(time_str.split(':')[1])
 
+    decimal = minute / 60
+    return float(hour) + decimal
+    
 class Gantt():
+    OrrangeColor = "#fd6a45"
+    BlueColor = '#48a3f5'
     """Gantt
     Class to render a simple Gantt chart, with optional milestones
     """
@@ -79,8 +76,8 @@ class Gantt():
         self.dataFile = dataFile
 
         # some lists needed
-        self.packages = []
-        self.labels = []
+        self.shifts = []
+        self.names = []
 
         self._loadData()
         self._procData()
@@ -97,45 +94,43 @@ class Gantt():
             data = json.load(fh)
 
         # must-haves
-        self.title = data['title']
+        self.title = "Gantt Chart For Shifts"
 
-        for pkg in data['packages']:
-            self.packages.append(Package(pkg))
+        for pkg in data['shifts']:
+            self.shifts.append(Package(pkg))
 
-        self.labels = [pkg['label'] for pkg in data['packages']]
+        self.names = [pkg['name'] for pkg in data['shifts']]
 
-        # optionals
-        self.milestones = {}
-        for pkg in self.packages:
-            try:
-                self.milestones[pkg.label] = pkg.milestones
-            except AttributeError:
-                pass
-
-        try:
-            self.xlabel = data['xlabel']
-        except KeyError:
-            self.xlabel = ""
-        try:
-            self.xticks = data['xticks']
-        except KeyError:
-            self.xticks = ""
+        self.xlabel = "time(Day)"
 
     def _procData(self):
         """ Process data to have all values needed for plotting
         """
         # parameters for bars
-        self.nPackages = len(self.labels)
-        self.start = [None] * self.nPackages
-        self.end = [None] * self.nPackages
+        self.nShifts = len(self.names)
+        self.start = [None] * self.nShifts
+        self.end = [None] * self.nShifts
 
-        for pkg in self.packages:
-            idx = self.labels.index(pkg.label)
+        for pkg in self.shifts:
+            idx = self.names.index(pkg.name)
             self.start[idx] = pkg.start
             self.end[idx] = pkg.end
 
-        self.durations = map(sub, self.end, self.start)
-        self.yPos = np.arange(self.nPackages, 0, -1)
+        self.xticks = [float(i + parse_time(min(self.start))) for i in range(30)]
+
+        self.durations = []
+        for i in range(self.nShifts):
+            if (parse_time(self.end[i]) > parse_time(self.start[i])):
+                duration = parse_time(self.end[i]) - parse_time(self.start[i])
+            else: 
+                duration = parse_time(self.end[i]) + 24 - parse_time(self.start[i])
+            self.durations.append(duration)
+
+        self.yPos = np.arange(self.nShifts, 0, -1)
+        
+        self.startDates = []
+        for date in self.start:
+            self.startDates.append(parse_time(date))
 
     def format(self):
         """ Format various aspect of the plot, such as labels,ticks, BBox
@@ -151,78 +146,45 @@ class Gantt():
             right='off')
 
         # tighten axis but give a little room from bar height
-        plt.xlim(0, max(self.end))
-        plt.ylim(0.5, self.nPackages + .5)
+        plt.ylim(0.5, self.nShifts + .5)
 
         # add title and package names
-        plt.yticks(self.yPos, self.labels)
+        plt.yticks(self.yPos, self.names)
         plt.title(self.title)
 
         if self.xlabel:
             plt.xlabel(self.xlabel)
 
         if self.xticks:
-            plt.xticks(self.xticks, map(str, self.xticks))
-
-    def add_milestones(self):
-        """Add milestones to GANTT chart.
-        The milestones are simple yellow diamonds
-        """
-
-        if not self.milestones:
-            return
-
-        x = []
-        y = []
-        for key in self.milestones.keys():
-            for value in self.milestones[key]:
-                y += [self.yPos[self.labels.index(key)]]
-                x += [value]
-
-        plt.scatter(x, y, s=120, marker="D",
-                    color="yellow", edgecolor="black", zorder=3)
-
-    def add_legend(self):
-        """Add a legend to the plot iff there are legend entries in
-        the package definitions
-        """
-
-        cnt = 0
-        for pkg in self.packages:
-            if pkg.legend:
-                cnt += 1
-                idx = self.labels.index(pkg.label)
-                self.barlist[idx].set_label(pkg.legend)
-
-        if cnt > 0:
-            self.legend = self.ax.legend(
-                shadow=False, ncol=3, fontsize="medium")
+            plt.xticks(self.xticks, ["{}{}".format(int(i + parse_time(min(self.start)))%12 if int(i + parse_time(min(self.start)))%12 != 0 else 12, "A" if i < 12 else "P") for i in range(30)])
 
     def render(self):
-        """ Prepare data for plotting
-        """
 
         # init figure
         self.fig, self.ax = plt.subplots()
         self.ax.yaxis.grid(False)
         self.ax.xaxis.grid(True)
 
-        # assemble colors
         colors = []
-        for pkg in self.packages:
-            colors.append(pkg.color)
+        for i in range(self.nShifts):
+            if i%2:
+                colors.append(self.BlueColor)
+            else:
+                colors.append(self.OrrangeColor)
 
-        self.barlist = plt.barh(self.yPos, list(self.durations),
-                                left=self.start,
+        self.barlist = plt.barh(self.yPos, self.durations,
+                                left=self.startDates,
                                 align='center',
                                 height=.5,
                                 alpha=1,
                                 color=colors)
+        
+        for i in range(self.nShifts):
+            text = self.names[i] +  ' | ' + self.start[i] + ' ~ ' + self.end[i]
+            self.ax.text(self.startDates[i] + self.durations[i] / 2, self.yPos[i], text, va='center', ha='center', color='white', weight='bold')
 
         # format plot
         self.format()
-        self.add_milestones()
-        self.add_legend()
 
     @staticmethod
     def show():
@@ -243,4 +205,4 @@ if __name__ == '__main__':
     g = Gantt('sample.json')
     g.render()
     g.show()
-    # g.save('img/GANTT.png')
+    g.save('img/GANTT.png')

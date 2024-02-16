@@ -5,3 +5,4 @@ tests/cover
 .venv
 .tox
 *.egg-info
+/img
